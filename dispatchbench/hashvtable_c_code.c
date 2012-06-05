@@ -6,7 +6,7 @@
 
 
 typedef struct {
-  uint64_t id;
+  uint64_t id, id2, id3;
   void *funcptr;
 } entry_t;
 
@@ -17,17 +17,29 @@ typedef union {
   __m128i v;
 } u64_v2;
 
-uint64_t the_id;
+uint64_t fallback_id;
+uint64_t the_id, the_id2, the_id3;
 uint64_t h;
 
+#ifdef IMID
+#define the_id 0xffffffffffffff42ULL
+#define the_id2 0xffffffffffffff52ULL
+#define the_id3 0xffffffffffffff62ULL
+#define fallback_id 0xffffffffffffff43ULL
+#endif
+
+#ifdef IMHASH
+#define h 0xfffffffffdfffULL
+#endif
 
 typedef struct {
-  __m128i masks, shifts;
+  //  __m128i masks, shifts;
   uint64_t m1;
   uint64_t m2;
-  uint64_t r1;
-  uint64_t r2;
-  uint64_t r3;
+  unsigned char r1;
+  unsigned char r2;
+  unsigned char r3;
+  entry_t fallback;
   entry_t funcs[64];
 } table_t;
 
@@ -63,6 +75,22 @@ double two_table_lookup(double value, table_t *table, uint64_t k) {
   return func(value);
 }
 
+double two_table_onecollision_lookup(double value, table_t *table, uint64_t k) {
+  uint64_t slot = ((h >> table->r1) ^ (h >> table->r2)) & table->m1;
+  double (*func)(double);
+  if (unlikely(table->funcs[slot].id != fallback_id)) {
+    if (likely(table->fallback.id == fallback_id)) {
+      func = table->fallback.funcptr;
+      return func(value);
+    } else {
+      return 0;
+    }
+  } else {
+    func = table->funcs[slot].funcptr;
+    return func(value);
+  }
+}
+
 double three_table_lookup(double value, table_t *table, uint64_t k) {
   uint64_t slot = ((h >> table->r1) ^ (h >> table->r2) ^ (h >> table->r3)) & table->m1;
   double (*func)(double);
@@ -71,12 +99,42 @@ double three_table_lookup(double value, table_t *table, uint64_t k) {
   return func(value);
 }
 
-double twohalf_table_lookup(double value, table_t *table, uint64_t k) {
-  uint64_t slot = ((h >> table->r1) ^ (h >> table->r2) ^ h) & table->m1;
+double three_table_lookup_96(double value, table_t *table, uint64_t k) {
+  uint64_t slot = ((h >> table->r1) ^ (h >> table->r2) ^ (h >> table->r3)) & table->m1;
   double (*func)(double);
-  if (unlikely(table->funcs[slot].id != the_id)) return 0;
-  func = table->funcs[slot].funcptr;
-  return func(value);
+  if (likely(table->funcs[slot].id == the_id && 
+             (table->funcs[slot].id2 & 0xffffffffffff0000ULL) == (the_id2 & 0xffffffffffff0000ULL))) {
+    func = table->funcs[slot].funcptr;
+    return func(value);
+  } else {
+    return 0;
+  }
+}
+
+double three_table_lookup_128(double value, table_t *table, uint64_t k) {
+  uint64_t slot = ((h >> table->r1) ^ (h >> table->r2) ^ (h >> table->r3)) & table->m1;
+  double (*func)(double);
+  if (likely(table->funcs[slot].id == the_id && 
+             table->funcs[slot].id2 == the_id2)) {
+    func = table->funcs[slot].funcptr;
+    return func(value);
+  } else {
+    return 0;
+  }
+}
+
+double three_table_lookup_160(double value, table_t *table, uint64_t k) {
+  uint64_t slot = ((h >> table->r1) ^ (h >> table->r2) ^ (h >> table->r3)) & table->m1;
+  double (*func)(double);
+  if (likely(table->funcs[slot].id == the_id && 
+             table->funcs[slot].id2 == the_id2 &&
+             (table->funcs[slot].id3 & 0xffffffffffff0000ULL) ==
+               (the_id3 & 0xffffffffffff0000ULL))) {
+    func = table->funcs[slot].funcptr;
+    return func(value);
+  } else {
+    return 0;
+  }
 }
 
 double doublemask(double value, table_t *table, uint64_t k) {
@@ -96,7 +154,7 @@ double doublemask2(double value, table_t *table, uint64_t k) {
   func = table->funcs[slot].funcptr;
   return func(value);
 }
-
+/*
 double doublemask_sse(double value, table_t *table, uint64_t k) {
   u64_v2 x;
   __m128i hvec, hvec_shuf, maskvec, shiftvec;
@@ -118,3 +176,4 @@ double doublemask_sse(double value, table_t *table, uint64_t k) {
   return func(value);
 }
 
+*/
