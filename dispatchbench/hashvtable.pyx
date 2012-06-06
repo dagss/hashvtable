@@ -27,23 +27,27 @@ cdef extern from *:
 
 cdef extern from "stdint.h":
     ctypedef unsigned long uint64_t
+    ctypedef unsigned short uint16_t
 
 ctypedef struct u64_v2:
     uint64_t x, y
 
-ctypedef struct entry_t:
-    uint64_t id, id2, id3
-    void *funcptr
 
-cdef struct table_t:
-#    u64_v2 masks
-#    u64_v2 shifts
-    uint64_t m1, m2
-    unsigned char r1
-    unsigned char r2
-    unsigned char r3
-    entry_t fallback
-    entry_t funcs[64]
+cdef extern from "hashvtable.h":
+    int D_COUNT
+    
+    ctypedef struct entry_t:
+        uint64_t id, id2, id3
+        void *funcptr
+
+    ctypedef struct table_t:
+        uint64_t m1, m2
+        unsigned char r1
+        unsigned char r2
+        unsigned char r3
+        uint16_t d[0]
+        entry_t fallback
+        entry_t funcs[64]
 
 cdef extern:
     uint64_t the_id, the_id2, the_id3, h, fallback_id
@@ -65,6 +69,9 @@ cdef void populate_table(table_t* table):
     table.fallback.funcptr = &times3
 #    table.shifts.x = table.r1
 #    table.shifts.y = table.r2
+    for i in range(D_COUNT):
+        table.d[i] = 3
+
     for i in range(64):
         k = sin(i*i) * 5 + 5
         table.funcs[i].funcptr = &times3
@@ -96,6 +103,10 @@ cdef extern:
     double three_table_lookup_128(double value, table_t *table, long k)
     double three_table_lookup_160(double value, table_t *table, long k)
 
+    double displace1(double value, table_t *table, long k)
+    double displace2(double value, table_t *table, long k)
+    double displace3(double value, table_t *table, long k)
+
 
 hashtypes = ['direct', # 0
              'index', # 1
@@ -108,7 +119,10 @@ hashtypes = ['direct', # 0
              'doublemask2', # 8
              'threeshift96', # 9
              'threeshift128',
-             'threeshift160'] # 10
+             'threeshift160',
+             'displace1',
+             'displace2',
+             'displace3']
 
 def time_table_lookup(int n, int repeats, double x, hashtype):
     cdef int which = hashtypes.index(hashtype)
@@ -162,6 +176,16 @@ def time_table_lookup(int n, int repeats, double x, hashtype):
             elif which == 11:
                 for k in range(n):
                     value += three_table_lookup_160(x, &table, k)
+            elif which == 12:
+                for k in range(n):
+                    value += displace1(x, &table, k)
+            elif which == 13:
+                for k in range(n):
+                    value += displace2(x, &table, k)
+            elif which == 14:
+                for k in range(n):
+                    value += displace3(x, &table, k)
+                
             times[rep] = (walltime() - t) / n
         return times.min(), times.mean(), times.std(), value
     finally:

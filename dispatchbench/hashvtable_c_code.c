@@ -1,14 +1,10 @@
 #include <xmmintrin.h>
 #include <stdint.h>
 
+#include "hashvtable.h"
+
 #define likely(x)   __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
-
-
-typedef struct {
-  uint64_t id, id2, id3;
-  void *funcptr;
-} entry_t;
 
 typedef union {
   struct {
@@ -26,22 +22,15 @@ uint64_t h;
 #define the_id2 0xffffffffffffff52ULL
 #define the_id3 0xffffffffffffff62ULL
 #define fallback_id 0xffffffffffffff43ULL
+#else
+//#error
 #endif
 
 #ifdef IMHASH
-#define h 0xfffffffffdfffULL
+#define h 0xffffffffffffff42ULL
+#else
+//#error
 #endif
-
-typedef struct {
-  //  __m128i masks, shifts;
-  uint64_t m1;
-  uint64_t m2;
-  unsigned char r1;
-  unsigned char r2;
-  unsigned char r3;
-  entry_t fallback;
-  entry_t funcs[64];
-} table_t;
 
 
 double table_lookup_first_element(double value, table_t *table, uint64_t k) {
@@ -130,6 +119,39 @@ double three_table_lookup_160(double value, table_t *table, uint64_t k) {
              table->funcs[slot].id2 == the_id2 &&
              (table->funcs[slot].id3 & 0xffffffffffff0000ULL) ==
                (the_id3 & 0xffffffffffff0000ULL))) {
+    func = table->funcs[slot].funcptr;
+    return func(value);
+  } else {
+    return 0;
+  }
+}
+
+double displace1(double value, table_t *table, uint64_t k) {
+  uint64_t slot = ((h >> table->r1) ^ table->d[h & (D_COUNT - 1)]) & table->m1;
+  double (*func)(double);
+  if (likely(table->funcs[slot].id == the_id)) {
+    func = table->funcs[slot].funcptr;
+    return func(value);
+  } else {
+    return 0;
+  }
+}
+
+double displace2(double value, table_t *table, uint64_t k) {
+  uint64_t slot = ((h >> table->r1) ^ table->d[h & table->m2]) & table->m1;
+  double (*func)(double);
+  if (likely(table->funcs[slot].id == the_id)) {
+    func = table->funcs[slot].funcptr;
+    return func(value);
+  } else {
+    return 0;
+  }
+}
+
+double displace3(double value, table_t *table, uint64_t k) {
+  uint64_t slot = ((h >> table->r1) ^ table->d[(h >> table->r2) & table->m2]) & table->m1;
+  double (*func)(double);
+  if (likely(table->funcs[slot].id == the_id)) {
     func = table->funcs[slot].funcptr;
     return func(value);
   } else {
