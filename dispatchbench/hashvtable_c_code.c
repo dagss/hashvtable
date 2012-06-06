@@ -127,7 +127,7 @@ double three_table_lookup_160(double value, table_t *table, uint64_t k) {
 }
 
 double displace1(double value, table_t *table, uint64_t k) {
-  uint64_t slot = ((h >> table->r1) ^ table->d[h & (D_COUNT - 1)]) & table->m1;
+  uint64_t slot = ((h >> table->r1) & table->m1) ^ table->d[h & (D_COUNT - 1)];
   double (*func)(double);
   if (likely(table->funcs[slot].id == the_id)) {
     func = table->funcs[slot].funcptr;
@@ -138,7 +138,7 @@ double displace1(double value, table_t *table, uint64_t k) {
 }
 
 double displace2(double value, table_t *table, uint64_t k) {
-  uint64_t slot = ((h >> table->r1) ^ table->d[h & table->m2]) & table->m1;
+  uint64_t slot = ((h >> table->r1) & table->m1) ^ table->d[h & table->m2];
   double (*func)(double);
   if (likely(table->funcs[slot].id == the_id)) {
     func = table->funcs[slot].funcptr;
@@ -149,7 +149,7 @@ double displace2(double value, table_t *table, uint64_t k) {
 }
 
 double displace3(double value, table_t *table, uint64_t k) {
-  uint64_t slot = ((h >> table->r1) ^ table->d[(h >> table->r2) & table->m2]) & table->m1;
+  uint64_t slot = ((h >> table->r1) & table->m1) ^ table->d[(h >> table->r2) & table->m2];
   double (*func)(double);
   if (likely(table->funcs[slot].id == the_id)) {
     func = table->funcs[slot].funcptr;
