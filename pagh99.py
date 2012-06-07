@@ -45,7 +45,6 @@ def make_table(keys, n, b, max_d):
             # Step 2: Find displacement that makes this bin fill in open
             # slots only
             for d in range(min(b, max_d, n)):
-                d &= mask_f
                 hashval = f_hashes_bin ^ d
                 if np.all(T[hashval] == False):
                     T[hashval] = True
